@@ -11,7 +11,7 @@ pipeline {
         DOCKER_USERNAME = 'blondel'
     }
     stages {
-      stage ('Build image'){
+      stage ('Build images'){
           agent any
           steps {
             script {
