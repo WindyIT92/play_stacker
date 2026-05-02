@@ -8,12 +8,12 @@ pipeline {
         PRODUCTION = "${APP_NAME}-prod"
         ID_DOCKER = "${DOCKERHUB_AUTH_USR}"
         DOCKERHUB_AUTH = credentials('DOCKERHUB_ID')
-        STG_API_ENDPOINT = "http://ip10-0-5-5-d7r5q9u57ed0008ln4i0-1993.direct.docker.labs.eazytraining.fr"
-        STG_APP_ENDPOINT = "http://ip10-0-5-5-d7r5q9u57ed0008ln4i0-80.direct.docker.labs.eazytraining.fr"
-        PROD_API_ENDPOINT = "http://ip10-0-5-6-d7r5q9u57ed0008ln4i0-1993.direct.docker.labs.eazytraining.fr"
-        PROD_APP_ENDPOINT = "http://ip10-0-5-6-d7r5q9u57ed0008ln4i0-80.direct.docker.labs.eazytraining.fr"
+        STG_API_ENDPOINT = "ip10-0-6-5-d7r7hru57ed0008ln4k0-1993.direct.docker.labs.eazytraining.fr"
+        STG_APP_ENDPOINT = "ip10-0-6-5-d7r7hru57ed0008ln4k0-80.direct.docker.labs.eazytraining.fr"
+        PROD_API_ENDPOINT = "ip10-0-6-6-d7r7hru57ed0008ln4k0-1993.direct.docker.labs.eazytraining.fr"
+        PROD_APP_ENDPOINT = "ip10-0-6-6-d7r7hru57ed0008ln4k0-80.direct.docker.labs.eazytraining.fr"
         EXTERNAL_PORT = "${PARAM_PORT_EXPOSED}"
-        CONTAINER_IMAGE = "${DOCKERHUB_ID}/${IMAGE_NAME}:${IMAGE_TAG}"
+        CONTAINER_IMAGE = "${ID_DOCKER}/${IMAGE_NAME}:${IMAGE_TAG}"
     }
 
     parameters {
@@ -39,7 +39,7 @@ pipeline {
               sh '''
                   echo "Clean Environment"
               docker rm -f $IMAGE_NAME || echo "container does not exist"
-              docker run --name $IMAGE_NAME -d -p ${APP_EXPOSED_PORT}:80 ${ID_DOCKER}/$IMAGE_NAME:$IMAGE_TAG
+              docker run --name $IMAGE_NAME -d -p ${APP_EXPOSED_PORT}:$EXTERNAL_PORT ${ID_DOCKER}/$IMAGE_NAME:$IMAGE_TAG
               sleep 5
               curl http://172.17.0.1:${PORT_EXPOSED} | grep -q "Playbook Stacker"
               '''
@@ -88,7 +88,7 @@ pipeline {
       steps {
           script {
             sh """
-              echo  {\\"your_name\\":\\"${APP_NAME}\\",\\"container_image\\":\\"${CONTAINER_IMAGE}\\", \\"external_port\\":\\"${EXTERNAL_PORT}\\", \\"internal_port\\":\\"${INTERNAL_PORT}\\"}  > data.json 
+              echo  {\\"your_name\\":\\"${APP_NAME}\\",\\"container_image\\":\\"${CONTAINER_IMAGE}\\", \\"external_port\\":\\"${EXTERNAL_PORT}\\", \\"internal_port\\":\\"$APP_EXPOSED_PORT\\"}  > data.json 
               curl -v -X POST http://${STG_API_ENDPOINT}/staging -H 'Content-Type: application/json'  --data-binary @data.json  2>&1 | grep 200
             """
           }
@@ -104,7 +104,7 @@ pipeline {
        steps {
           script {
             sh """
-              echo  {\\"your_name\\":\\"${APP_NAME}\\",\\"container_image\\":\\"${CONTAINER_IMAGE}\\", \\"external_port\\":\\"${EXTERNAL_PORT}\\", \\"internal_port\\":\\"${INTERNAL_PORT}\\"}  > data.json 
+              echo  {\\"your_name\\":\\"${APP_NAME}\\",\\"container_image\\":\\"${CONTAINER_IMAGE}\\", \\"external_port\\":\\"${EXTERNAL_PORT}\\", \\"internal_port\\":\\"$APP_EXPOSED_PORT\\"}  > data.json 
               curl -v -X POST http://${PROD_API_ENDPOINT}/prod -H 'Content-Type: application/json'  --data-binary @data.json  2>&1 | grep 200
             """
           }
