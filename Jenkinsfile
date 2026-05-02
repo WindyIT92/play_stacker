@@ -6,7 +6,7 @@ pipeline {
         IMAGE_TAG = "v2"
         STAGING = "${APP_NAME}-staging"
         PRODUCTION = "${APP_NAME}-prod"
-        DOCKERHUB_ID = "${DOCKERHUB_AUTH_USR}"
+        ID_DOCKER = "${DOCKERHUB_AUTH_USR}"
         DOCKERHUB_AUTH = credentials('DOCKERHUB_ID')
         STG_API_ENDPOINT = "http://ip10-0-5-5-d7r5q9u57ed0008ln4i0-1993.direct.docker.labs.eazytraining.fr"
         STG_APP_ENDPOINT = "http://ip10-0-5-5-d7r5q9u57ed0008ln4i0-80.direct.docker.labs.eazytraining.fr"
