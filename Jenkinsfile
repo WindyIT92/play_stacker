@@ -1,7 +1,7 @@
 pipeline {
     environment {
         IMAGE_NAME = "${PARAM_IMAGE_NAME}"
-        APP_EXPOSED_PORT = "80"
+        APP_EXPOSED_PORT = "${PARAM_PORT_EXPOSED}"
         APP_NAME = "eazystacker"
         IMAGE_TAG = "v2"
         STAGING = "${APP_NAME}-staging"
