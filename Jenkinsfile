@@ -7,7 +7,7 @@ pipeline {
         STAGING = "${APP_NAME}-staging"
         PRODUCTION = "${APP_NAME}-prod"
         DOCKERHUB_ID = "${DOCKERHUB_AUTH_USR}"
-        DOCKERHUB_PASSWORD = credentials('DOCKERHUB_ID')
+        DOCKERHUB_AUTH = credentials('DOCKERHUB_ID')
         STG_API_ENDPOINT = "http://ip10-0-5-5-d7r5q9u57ed0008ln4i0-1993.direct.docker.labs.eazytraining.fr"
         STG_APP_ENDPOINT = "http://ip10-0-5-5-d7r5q9u57ed0008ln4i0-80.direct.docker.labs.eazytraining.fr"
         PROD_API_ENDPOINT = "http://ip10-0-5-6-d7r5q9u57ed0008ln4i0-1993.direct.docker.labs.eazytraining.fr"
@@ -73,8 +73,8 @@ pipeline {
           steps {
              script {
                sh '''
-                   echo $DOCKERHUB_PASSWORD_PSW | docker login -u $DOCKERHUB_PASSWORD_USR --password-stdin
-                   docker push ${DOCKERHUB_ID}/$IMAGE_NAME:$IMAGE_TAG
+                   docker login -u $DOCKERHUB_AUTH_USR -p $DOCKERHUB_AUTH_PSW
+                   docker push ${ID_DOCKER}/$IMAGE_NAME:$IMAGE_TAG
                '''
              }
           }
