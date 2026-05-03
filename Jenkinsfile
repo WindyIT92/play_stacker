@@ -99,7 +99,7 @@ pipeline {
           }
       }        
     }
-    post {
+    /*post {
        success {
          slackSend (color: '#00FF00', message: "SUCCESSFUL: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) - PROD URL => http://${HOSTNAME_DEPLOY_PROD} , STAGING URL => http://${SERVER_IP}")
          }
