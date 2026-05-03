@@ -1,114 +1,110 @@
+/* import shared library 
+@Library('shared-library')_*/
 pipeline {
-    environment {
-        IMAGE_NAME = "${PARAM_IMAGE_NAME}"
-        APP_EXPOSED_PORT = "${PARAM_PORT_EXPOSED}"
-        APP_NAME = "eazystacker"
-        IMAGE_TAG = "v2"
-        STAGING = "${APP_NAME}-staging"
-        PRODUCTION = "${APP_NAME}-prod"
-        ID_DOCKER = "${DOCKERHUB_AUTH_USR}"
-        DOCKERHUB_AUTH = credentials('DOCKERHUB_ID')
-        STG_API_ENDPOINT = "ip10-0-6-5-d7r7hru57ed0008ln4k0-1993.direct.docker.labs.eazytraining.fr"
-        STG_APP_ENDPOINT = "ip10-0-6-5-d7r7hru57ed0008ln4k0-80.direct.docker.labs.eazytraining.fr"
-        PROD_API_ENDPOINT = "ip10-0-6-6-d7r7hru57ed0008ln4k0-1993.direct.docker.labs.eazytraining.fr"
-        PROD_APP_ENDPOINT = "ip10-0-6-6-d7r7hru57ed0008ln4k0-80.direct.docker.labs.eazytraining.fr"
-        EXTERNAL_PORT = "${PARAM_PORT_EXPOSED}"
-        CONTAINER_IMAGE = "${ID_DOCKER}/${IMAGE_NAME}:${IMAGE_TAG}"
-    }
-
-    parameters {
-        // booleanParam(name: "RELEASE", defaultValue: false)
-        // choice(name: "DEPLOY_TO", choices: ["", "INT", "PRE", "PROD"])
-        string(name: 'PARAM_IMAGE_NAME', defaultValue: 'play_stacker', description: 'Image Name')
-        string(name: 'PARAM_PORT_EXPOSED', defaultValue: '80', description: 'APP EXPOSED PORT')        
-    }
     agent none
+    environment {
+        DOCKERHUB_AUTH = credentials('DOCKERHUB_ID')
+        ID_DOCKER = "${DOCKERHUB_AUTH_USR}"
+        PORT_EXPOSED = "80"
+        IMAGE_NAME = "play_stacker"
+        IMAGE_TAG = "v2"
+        DOCKER_USERNAME = 'windyit'
+    }
     stages {
-       stage('Build image') {
-           agent any
-           steps {
-              script {
-                sh 'docker build -t ${ID_DOCKER}/$IMAGE_NAME:$IMAGE_TAG .'
-              }
-           }
-       }
-       stage('Run container based on builded image') {
+      stage ('Build image'){
           agent any
           steps {
             script {
-              sh '''
-                  echo "Clean Environment"
+                sh 'docker build -t ${ID_DOCKER}/${IMAGE_NAME}:${IMAGE_TAG} .'
+            }
+        }
+      }
+      stage('Run container based on builded image and test') {
+        agent any
+        steps {
+         script {
+           sh '''
+              echo "Clean Environment"
               docker rm -f $IMAGE_NAME || echo "container does not exist"
-              docker run --name $IMAGE_NAME -d -p ${APP_EXPOSED_PORT}:$EXTERNAL_PORT ${ID_DOCKER}/$IMAGE_NAME:$IMAGE_TAG
+              docker run --name $IMAGE_NAME -d -p ${PORT_EXPOSED}:80 ${ID_DOCKER}/$IMAGE_NAME:$IMAGE_TAG
               sleep 5
               curl http://172.17.0.1:${PORT_EXPOSED} | grep -q "Playbook Stacker"
-              '''
-             }
-          }
-       }
-       stage('Test image') {
-           agent any
-           steps {
-              script {
-                sh '''
-                   curl -v 172.17.0.1:$APP_EXPOSED_PORT | grep -q "Playbook Stacker"
-                '''
-              }
-           }
-       }
-       stage('Clean container') {
-          agent any
-          steps {
-             script {
-               sh '''
-                   docker stop $IMAGE_NAME
-                   docker rm $IMAGE_NAME
-               '''
-             }
-          }
-      }
-
-      stage ('Login and Push Image on docker hub') {
-          agent any
-          steps {
-             script {
-               sh '''
-                   docker login -u $DOCKERHUB_AUTH_USR -p $DOCKERHUB_AUTH_PSW
-                   docker push ${ID_DOCKER}/$IMAGE_NAME:$IMAGE_TAG
-               '''
-             }
-          }
-      }
-
-      stage('STAGING - Deploy app') {
-        when {
-           expression { GIT_BRANCH == 'origin/main' }
-       }
-      agent any
-      steps {
-          script {
-            sh """
-              echo  {\\"your_name\\":\\"${APP_NAME}\\",\\"container_image\\":\\"${CONTAINER_IMAGE}\\", \\"external_port\\":\\"${EXTERNAL_PORT}\\", \\"internal_port\\":\\"$APP_EXPOSED_PORT\\"}  > data.json 
-              curl -v -X POST http://${STG_API_ENDPOINT}/staging -H 'Content-Type: application/json'  --data-binary @data.json  2>&1 | grep 200
-            """
-          }
+           '''
+         }
         }
-     
-     }
-     stage('PROD - Deploy app') {
-       when {
-           expression { GIT_BRANCH == 'origin/main' }
-       }
-     agent any
-
-       steps {
-          script {
-            sh """
-              echo  {\\"your_name\\":\\"${APP_NAME}\\",\\"container_image\\":\\"${CONTAINER_IMAGE}\\", \\"external_port\\":\\"${EXTERNAL_PORT}\\", \\"internal_port\\":\\"$APP_EXPOSED_PORT\\"}  > data.json 
-              curl -v -X POST http://${PROD_API_ENDPOINT}/prod -H 'Content-Type: application/json'  --data-binary @data.json  2>&1 | grep 200
-            """
+      }
+      stage('Clean Container'){
+          agent any
+          steps {
+              script {
+                  sh '''
+                      docker stop $IMAGE_NAME
+                      docker rm $IMAGE_NAME
+                  '''
+              }
           }
-       }
-     }
-  }
+      }
+      stage('Login and Push Image on docker hub'){
+          agent any
+          steps {
+              script {
+                  sh '''
+                    docker login -u $DOCKERHUB_AUTH_USR -p $DOCKERHUB_AUTH_PSW
+                    docker push ${ID_DOCKER}/$IMAGE_NAME:$IMAGE_TAG
+                  '''
+              }
+          }
+      }
+
+      stage('Deploy in staging'){
+          agent any
+            environment {
+                SERVER_IP = "18.206.201.73"
+            }
+          steps {
+            sshagent(['SSH_AUTH_SERVER']) {
+                sh '''
+                    ssh -o StrictHostKeyChecking=no -l ubuntu $SERVER_IP "docker rm -f $IMAGE_NAME || echo 'All deleted'"
+                    ssh -o StrictHostKeyChecking=no -l ubuntu $SERVER_IP "docker pull $DOCKER_USERNAME/$IMAGE_NAME:$IMAGE_TAG || echo 'Image Download successfully'"
+                    sleep 30
+                    ssh -o StrictHostKeyChecking=no -l ubuntu $SERVER_IP "docker run --rm -dp $PORT_EXPOSED:80 --name $IMAGE_NAME $DOCKER_USERNAME/$IMAGE_NAME:$IMAGE_TAG"
+                    sleep 5
+                    curl -I http://$SERVER_IP:$PORT_EXPOSED
+                '''
+            }
+          }
+      }
+      stage('Deploy in prod'){
+          agent any
+            environment {
+                HOSTNAME_DEPLOY_PROD = "3.81.212.48"
+            }
+          steps {
+            sshagent(credentials: ['SSH_AUTH_SERVER']) {
+                sh '''
+                    [ -d ~/.ssh ] || mkdir ~/.ssh && chmod 0700 ~/.ssh
+                    ssh-keyscan -t rsa,dsa ${HOSTNAME_DEPLOY_PROD} >> ~/.ssh/known_hosts
+                    command1="docker login -u $DOCKERHUB_AUTH_USR -p $DOCKERHUB_AUTH_PSW"
+                    command2="docker pull $DOCKERHUB_AUTH_USR/$IMAGE_NAME:$IMAGE_TAG"
+                    command3="docker rm -f play_stacker || echo 'app does not exist'"
+                    command4="docker run -d -p 80:80 --name play_stacker $DOCKERHUB_AUTH_USR/$IMAGE_NAME:$IMAGE_TAG"
+                    ssh -o StrictHostKeyChecking=no ubuntu@${HOSTNAME_DEPLOY_PROD} \
+                        -o SendEnv=IMAGE_NAME \
+                        -o SendEnv=IMAGE_TAG \
+                        -o SendEnv=DOCKERHUB_AUTH_USR \
+                        -o SendEnv=DOCKERHUB_AUTH_PSW \
+                        -C "$command1 && $command2 && $command3 && $command4"
+                '''
+            }
+          }
+      }        
+    }
+    post {
+       success {
+         slackSend (color: '#00FF00', message: "SUCCESSFUL: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}) - PROD URL => http://${HOSTNAME_DEPLOY_PROD} , STAGING URL => http://${SERVER_IP}")
+         }
+      failure {
+            slackSend (color: '#FF0000', message: "FAILED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})")
+          }   
+    }
 }
